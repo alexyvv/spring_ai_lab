@@ -12,11 +12,11 @@ public class LabSpringAIApplication {
     public static void main(String[] args) {
 
         ConfigurableApplicationContext context = SpringApplication.run(LabSpringAIApplication.class, args);
-        final ChatClient chatClient = context.getBean(ChatClient.class);
-        String answer = chatClient.prompt("дай первую строчку Bohemian Rhapsody")
-                .options(OllamaOptions.builder().build())
-                .call()
-                .content();
-        System.out.println(answer);
+//        final ChatClient chatClient = context.getBean(ChatClient.class);
+//        String answer = chatClient.prompt("дай первую строчку Bohemian Rhapsody")
+//                .options(OllamaOptions.builder().build())
+//                .call()
+//                .content();
+//        System.out.println(answer);
     }
 }

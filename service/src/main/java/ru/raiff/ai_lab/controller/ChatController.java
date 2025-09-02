@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import ru.raiff.ai_lab.dto.*;
 import ru.raiff.ai_lab.model.Chat;
 import ru.raiff.ai_lab.model.ChatEntry;
+import ru.raiff.ai_lab.service.AIService;
 import ru.raiff.ai_lab.service.ChatService;
 
 import java.util.List;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 public class ChatController {
     
     private final ChatService chatService;
+    private final AIService aiService;
     
     @GetMapping("/")
     public String index(Model model) {
@@ -34,6 +36,13 @@ public class ChatController {
     public String viewChat(@PathVariable Long chatId, Model model) {
         Chat chat = chatService.getChatWithEntries(chatId)
                 .orElseThrow(() -> new RuntimeException("Chat not found"));
+        
+        // Ensure entries are loaded
+        if (chat.getEntries() == null) {
+            chat.setEntries(chatService.getChatEntries(chatId));
+        }
+        
+        log.info("Loading chat {} with {} entries", chatId, chat.getEntries().size());
         
         List<Chat> chats = chatService.getAllChats();
         model.addAttribute("chat", chat);
@@ -65,24 +74,62 @@ public class ChatController {
     }
     
     @PostMapping("/chat/{chatId}/entry")
-    public String addChatEntry(
-            @PathVariable Long chatId,
-            @RequestParam String prompt) {
+    public String talkToModel(@PathVariable Long chatId, @RequestParam String prompt) {
         
-        log.info("Adding entry to chat {}: content length={}", 
-                chatId, prompt != null ? prompt.length() : 0);
+        log.info("Processing user prompt for chat {}: prompt=[{}]", chatId, prompt);
         
         if (prompt != null && !prompt.trim().isEmpty()) {
-            // Add user message
-            chatService.addChatEntry(chatId, prompt, ChatEntry.Role.USER);
-            
-            // TODO: Here you would typically call your AI service to get a response
-            // For now, let's add a simple response
-            String assistantResponse = "Это симулированный ответ на: " + prompt;
-            chatService.addChatEntry(chatId, assistantResponse, ChatEntry.Role.ASSISTANT);
+            try {
+                // Add user message
+                ChatEntry userEntry = chatService.addChatEntry(chatId, prompt, ChatEntry.Role.USER);
+                log.info("User message saved with id: {}", userEntry.getId());
+                
+                // Get context from previous messages (optional)
+                List<ChatEntry> previousEntries = chatService.getChatEntries(chatId);
+                log.info("Retrieved {} previous entries for context", previousEntries.size());
+                
+                String context = buildContext(previousEntries, 5); // Last 5 messages for context
+                log.info("Built context: {}", context);
+                
+                // Generate AI response
+                log.info("Calling AI service...");
+                String assistantResponse = context != null && !context.isEmpty() ? 
+                        aiService.generateResponseWithContext(prompt, context) :
+                        aiService.generateResponse(prompt);
+                
+                log.info("AI response received: {}", assistantResponse);
+                
+                // Save assistant response
+                ChatEntry assistantEntry = chatService.addChatEntry(chatId, assistantResponse, ChatEntry.Role.ASSISTANT);
+                log.info("Assistant response saved with id: {}", assistantEntry.getId());
+                
+            } catch (Exception e) {
+                log.error("Error processing chat entry", e);
+            }
+        } else {
+            log.warn("Empty prompt received for chat {}", chatId);
         }
         
         return "redirect:/chat/" + chatId;
+    }
+    
+    private String buildContext(List<ChatEntry> entries, int maxEntries) {
+        if (entries == null || entries.isEmpty()) {
+            return "";
+        }
+        
+        int startIndex = Math.max(0, entries.size() - maxEntries);
+        StringBuilder context = new StringBuilder();
+        
+        for (int i = startIndex; i < entries.size(); i++) {
+            ChatEntry entry = entries.get(i);
+            context.append(entry.getRole().name())
+                   .append(": ")
+                   .append(entry.getContent())
+                   .append("\n");
+        }
+        
+        return context.toString();
     }
     
     @GetMapping("/api/chat/{chatId}/entries")

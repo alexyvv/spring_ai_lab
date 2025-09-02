@@ -35,7 +35,12 @@ public class ChatService {
     }
     
     public Optional<Chat> getChatWithEntries(Long id) {
-        return chatRepository.findByIdWithEntries(id);
+        Optional<Chat> chatOpt = chatRepository.findByIdWithEntries(id);
+        chatOpt.ifPresent(chat -> {
+            log.info("Loaded chat {} with {} entries", chat.getId(), 
+                    chat.getEntries() != null ? chat.getEntries().size() : 0);
+        });
+        return chatOpt;
     }
     
     public List<Chat> getAllChats() {
