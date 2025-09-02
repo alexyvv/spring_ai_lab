@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +48,38 @@ public class AIService {
         } catch (Exception e) {
             log.error("Error generating AI response with context", e);
             return "Извините, произошла ошибка при генерации ответа: " + e.getMessage();
+        }
+    }
+    
+    public Flux<String> streamResponse(String prompt) {
+        log.info("Streaming AI response for prompt: {}", prompt);
+        
+        try {
+            return chatClient.prompt()
+                    .user(prompt)
+                    .stream()
+                    .content();
+        } catch (Exception e) {
+            log.error("Error streaming AI response", e);
+            return Flux.just("Извините, произошла ошибка при генерации ответа: " + e.getMessage());
+        }
+    }
+    
+    public Flux<String> streamResponseWithContext(String prompt, String context) {
+        log.info("Streaming AI response with context");
+        
+        try {
+            String fullPrompt = context != null ? 
+                    "Context: " + context + "\n\nUser: " + prompt : 
+                    prompt;
+            
+            return chatClient.prompt()
+                    .user(fullPrompt)
+                    .stream()
+                    .content();
+        } catch (Exception e) {
+            log.error("Error streaming AI response with context", e);
+            return Flux.just("Извините, произошла ошибка при генерации ответа: " + e.getMessage());
         }
     }
 }

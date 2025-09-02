@@ -2,18 +2,23 @@ package ru.raiff.ai_lab.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import ru.raiff.ai_lab.dto.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
+import ru.raiff.ai_lab.dto.ChatDto;
+import ru.raiff.ai_lab.dto.ChatEntryDto;
 import ru.raiff.ai_lab.model.Chat;
 import ru.raiff.ai_lab.model.ChatEntry;
 import ru.raiff.ai_lab.service.AIService;
 import ru.raiff.ai_lab.service.ChatService;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Controller
@@ -23,6 +28,7 @@ public class ChatController {
     
     private final ChatService chatService;
     private final AIService aiService;
+    private final ExecutorService executorService = Executors.newCachedThreadPool();
     
     @GetMapping("/")
     public String index(Model model) {
@@ -93,7 +99,7 @@ public class ChatController {
                 
                 // Generate AI response
                 log.info("Calling AI service...");
-                String assistantResponse = context != null && !context.isEmpty() ? 
+                String assistantResponse = !context.isEmpty() ?
                         aiService.generateResponseWithContext(prompt, context) :
                         aiService.generateResponse(prompt);
                 
@@ -178,5 +184,113 @@ public class ChatController {
         dto.setRole(entry.getRole().name());
         dto.setCreatedAt(entry.getCreatedAt());
         return dto;
+    }
+    
+    @GetMapping(value = "/chat-stream/{chatId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @ResponseBody
+    public SseEmitter streamChat(@PathVariable Long chatId, 
+                                  @RequestParam(required = false) String userPrompt) {
+        
+        log.info("Stream request for chat {} with prompt: {}", chatId, userPrompt);
+        
+        SseEmitter emitter = new SseEmitter(300000L); // 5 minutes timeout
+        
+        executorService.execute(() -> {
+            try {
+                if (userPrompt != null && !userPrompt.trim().isEmpty()) {
+                    // Save user message
+                    ChatEntry userEntry = chatService.addChatEntry(chatId, userPrompt, ChatEntry.Role.USER);
+                    log.info("Saved user message: {}", userEntry.getId());
+                    
+                    // Get context
+                    List<ChatEntry> previousEntries = chatService.getChatEntries(chatId);
+                    String context = buildContext(previousEntries, 5);
+                    
+                    // Stream AI response using reactive stream
+                    Flux<String> responseStream = context != null && !context.isEmpty() ?
+                            aiService.streamResponseWithContext(userPrompt, context) :
+                            aiService.streamResponse(userPrompt);
+                    
+                    StringBuilder fullResponse = new StringBuilder();
+                    
+                    responseStream.subscribe(
+                        chunk -> {
+                            try {
+                                fullResponse.append(chunk);
+                                // Send in format expected by frontend
+                                String jsonData = String.format("{\"text\":\"%s\"}", 
+                                        chunk.replace("\"", "\\\"")
+                                              .replace("\n", "\\n")
+                                              .replace("\r", "\\r"));
+                                emitter.send(jsonData);
+                                log.debug("Sent chunk: {}", chunk);
+                            } catch (Exception e) {
+                                log.error("Error sending chunk", e);
+                            }
+                        },
+                        error -> {
+                            log.error("Error in stream", error);
+                            emitter.completeWithError(error);
+                        },
+                        () -> {
+                            try {
+                                // Save complete assistant response
+                                String finalResponse = fullResponse.toString();
+                                chatService.addChatEntry(chatId, finalResponse, ChatEntry.Role.ASSISTANT);
+                                log.info("Saved assistant response for chat {}", chatId);
+                                
+                                emitter.complete();
+                            } catch (Exception e) {
+                                log.error("Error completing stream", e);
+                                emitter.completeWithError(e);
+                            }
+                        }
+                    );
+                } else {
+                    emitter.complete();
+                }
+            } catch (Exception e) {
+                log.error("Error in streaming", e);
+                emitter.completeWithError(e);
+            }
+        });
+        
+        return emitter;
+    }
+    
+    @GetMapping("/api/chat/{chatId}/stream")
+    @ResponseBody
+    @CrossOrigin
+    public Flux<String> streamChatFlux(@PathVariable Long chatId, 
+                                        @RequestParam String prompt) {
+        log.info("Flux stream request for chat {} with prompt: {}", chatId, prompt);
+        
+        return Flux.create(sink -> {
+            try {
+                // Save user message
+                chatService.addChatEntry(chatId, prompt, ChatEntry.Role.USER);
+                
+                // Generate and stream response
+                String response = aiService.generateResponse(prompt);
+                
+                // Stream word by word
+                String[] words = response.split(" ");
+                for (String word : words) {
+                    sink.next(word + " ");
+                    try {
+                        Thread.sleep(50);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                
+                // Save assistant response
+                chatService.addChatEntry(chatId, response, ChatEntry.Role.ASSISTANT);
+                
+                sink.complete();
+            } catch (Exception e) {
+                sink.error(e);
+            }
+        });
     }
 }

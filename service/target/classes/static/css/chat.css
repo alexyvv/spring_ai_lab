@@ -19,6 +19,9 @@ body.comic-body {
     overflow: hidden;
 }
 
+/* Note: Loading animation styles are now injected via JavaScript in chat.js */
+/* This keeps all animation logic in one place for easier maintenance */
+
 /* Sidebar (боковая панель) */
 .sidebar {
     width: 280px;
