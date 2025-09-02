@@ -292,19 +292,41 @@ body.comic-body {
     color: #333;
 }
 
+/* Button group container */
+.button-group {
+    display: flex;
+    gap: 10px;
+}
+
+/* Common button styles */
 .input-bubble button {
     padding: 10px 14px;
-    background: #00bfff;
     border: none;
     color: #fff;
     font-size: 1em;
     border-radius: 12px;
     cursor: pointer;
     transition: background 0.15s, transform 0.1s;
+    font-weight: bold;
 }
 
-.input-bubble button:hover {
+/* Streaming button (blue) */
+.input-bubble .send-streaming {
+    background: #00bfff;
+}
+
+.input-bubble .send-streaming:hover {
     background: #24d0ff;
+    transform: scale(1.02);
+}
+
+/* MVC button (green) */
+.input-bubble .send-mvc {
+    background: #4CAF50;
+}
+
+.input-bubble .send-mvc:hover {
+    background: #5CBF60;
     transform: scale(1.02);
 }
 

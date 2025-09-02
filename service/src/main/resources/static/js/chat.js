@@ -60,10 +60,65 @@ document.addEventListener("DOMContentLoaded", function() {
     document.head.appendChild(style);
     
     const sendButton = document.getElementById("send-button");
+    const sendMvcButton = document.getElementById("send-mvc-button");
     const chatInput = document.getElementById("chat-input");
     const messagesContainer = document.getElementById("messages");
+    
+    // Обработка отправки формы для MVC
+    const form = document.querySelector('form.input-area');
+    if (form && sendMvcButton) {
+        // Обработчик клика на MVC кнопку
+        sendMvcButton.addEventListener("click", function(e) {
+            const prompt = chatInput.value.trim();
+            if (!prompt) {
+                e.preventDefault();
+                return;
+            }
+            
+            // Добавляем сообщение пользователя в чат (как в streaming)
+            const userDiv = document.createElement("div");
+            userDiv.className = "message user";
+            userDiv.innerHTML = `<img src="/images/user.png" alt="User"><div class="bubble">${prompt}</div>`;
+            messagesContainer.appendChild(userDiv);
+            
+            // Создаем блок для ответа AI с анимацией
+            const aiDiv = document.createElement("div");
+            aiDiv.className = "message mentor";
+            const img = document.createElement("img");
+            img.src = "/images/mentor.png";
+            img.alt = "Mentor";
+            aiDiv.appendChild(img);
+            
+            const aiBubble = document.createElement("div");
+            aiBubble.className = "bubble";
+            
+            // Добавляем анимацию загрузки
+            const thinkingIndicator = document.createElement("div");
+            thinkingIndicator.className = "ai-thinking";
+            
+            for (let i = 0; i < 3; i++) {
+                const dot = document.createElement("span");
+                dot.className = "dot";
+                thinkingIndicator.appendChild(dot);
+            }
+            
+            aiBubble.appendChild(thinkingIndicator);
+            aiDiv.appendChild(aiBubble);
+            messagesContainer.appendChild(aiDiv);
+            
+            // Плавная прокрутка вниз
+            messagesContainer.scrollTo({
+                top: messagesContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+            
+            // Кнопка type="submit" автоматически отправит форму
+            // Не нужно вызывать preventDefault или submit вручную
+        });
+    }
 
-    sendButton.addEventListener("click", function() {
+    sendButton.addEventListener("click", function(e) {
+        e.preventDefault(); // Предотвращаем отправку формы
         const prompt = chatInput.value;
         if (!prompt) return;
         chatInput.value = "";

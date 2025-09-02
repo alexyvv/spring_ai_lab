@@ -51,6 +51,10 @@
 
         <div class="messages" id="messages">
             <th:block th:if="${chat != null}">
+                <!-- Debug: показываем количество entries -->
+                <div th:if="${#lists.isEmpty(chat.entries)}" style="display: none;">
+                    <span th:text="'No entries found for chat ' + ${chat.id}"></span>
+                </div>
                 <div th:if="${!#lists.isEmpty(chat.entries)}" th:each="entry : ${chat.entries}"
                      th:class="${entry.role.name() eq 'USER'} ? 'message user' : 'message mentor'"><img
                         th:src="${entry.role.name() eq 'USER'} ? '/images/user.png' : '/images/mentor.png'" alt="avatar">
@@ -64,7 +68,10 @@
                 <div class="input-bubble">
                     <label for="chat-input" class="sr-only">Спрашивай</label>
                     <textarea id="chat-input" name="prompt" placeholder="Спрашивай..." required></textarea>
-                    <button type="button" id="send-button">SEND</button>
+                    <div class="button-group">
+                        <button type="button" id="send-button" class="send-streaming">SEND RX</button>
+                        <button type="submit" id="send-mvc-button" class="send-mvc">SEND MVC</button>
+                    </div>
                 </div>
             </form>
         </div>

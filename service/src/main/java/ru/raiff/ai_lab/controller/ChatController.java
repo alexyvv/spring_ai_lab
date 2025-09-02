@@ -44,7 +44,8 @@ public class ChatController {
                 .orElseThrow(() -> new RuntimeException("Chat not found"));
         
         // Ensure entries are loaded
-        if (chat.getEntries() == null) {
+        if (chat.getEntries() == null || chat.getEntries().isEmpty()) {
+            log.info("Entries not loaded via JOIN FETCH, loading separately");
             chat.setEntries(chatService.getChatEntries(chatId));
         }
         
