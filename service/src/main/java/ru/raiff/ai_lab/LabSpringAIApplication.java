@@ -13,7 +13,7 @@ public class LabSpringAIApplication {
 
         ConfigurableApplicationContext context = SpringApplication.run(LabSpringAIApplication.class, args);
         final ChatClient chatClient = context.getBean(ChatClient.class);
-        String answer = chatClient.prompt("дай первую строчку богемской рапсодии")
+        String answer = chatClient.prompt("дай первую строчку Bohemian Rhapsody")
                 .options(OllamaOptions.builder().build())
                 .call()
                 .content();
